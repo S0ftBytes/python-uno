@@ -207,3 +207,5 @@ class Game:
                    
         while self.game_active:
             self.handle_round()
+        
+        return get_winner()

@@ -8,5 +8,6 @@ import uno
 
 #Create the game instance for 4 players, each being dealt 7 cards to start
 game = uno.Game(4,7)
-game.start_game()
+# Synchronously extract the winner from the game on end to enable future calculations
+winner = game.start_game()
 ```
