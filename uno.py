@@ -38,6 +38,12 @@ class Game:
 
     def __init__(self, player_count, cards_per_player):
         """Initialize a new game with the specified number of players and cards per player."""
+        self.robots = []
+
+        if(player_count == 1):
+            player_count = 2
+            self.robots.append(2)
+
         self.player_count = player_count
         self.current_deck, self.played_cards = utils.shuffle_deck(utils.create_deck(['yellow', 'green', 'blue', 'red']))
         self.player_hands = utils.deal_cards(self.current_deck, player_count, cards_per_player)
@@ -89,19 +95,22 @@ class Game:
         
         print("Here are your all cards. (Not all are playable): " + str(player_hand))
         card = None
-        
-        while card == None:
-            try:
-                selection = int(input("Select card to play (1) or play random card (2)"))
-                
-                if selection == 1:
-                    card = self.play_card(player)
-                elif selection == 2:
-                    card = self.play_random(player)
-                else:
-                    print(type(selection))
-            except:
-                print('You must enter either 1 or 2')
+
+        if player in self.robots:
+            card = self.play_random(player)
+        else:
+            while card == None:
+                try:
+                    selection = int(input("Select card to play (1) or play random card (2)"))
+                    
+                    if selection == 1:
+                        card = self.play_card(player)
+                    elif selection == 2:
+                        card = self.play_random(player)
+                    else:
+                        print(type(selection))
+                except:
+                    print('You must enter either 1 or 2')
             
         
         self.played_cards.append(card)
@@ -198,7 +207,7 @@ class Game:
         self.winning_player = player
         self.game_active = False
 
-    def get_winner():
+    def get_winner(self):
         return self.winning_player    
         
     def start_game(self):
@@ -208,4 +217,4 @@ class Game:
         while self.game_active:
             self.handle_round()
         
-        return get_winner()
+        return self.get_winner()
