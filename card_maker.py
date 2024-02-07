@@ -1,4 +1,6 @@
 from card import Card, PowerCard
+import utils
+import random
 
 class CardMaker:
     def __init__(self, colours):
@@ -31,21 +33,18 @@ class CardMaker:
         return True
 
     def handle_wild_card(self, game_instance, card):
-        colour = None
-        
-        while colour == None:
-            input_colour = str(input("Enter a valid colour for the wild card (" + str(self.colours) + "): ")).lower()
-            
-            if input_colour in self.colours: colour = input_colour
-        
+        current_player = game_instance.get_current_player()
+        player_hand = game_instance.get_player_cards(current_player)
+
+        colour = utils.find_dominant_colour(player_hand, self.colours)
         card.set_colour(colour)
 
     def create_wild_card(self):
         return PowerCard('wild', first_playable=False, custom_is_playable=self.wild_card_playable, play_handler=self.handle_wild_card)
 
     def handle_special_wild_card(self, game_instance, card):
-        handle_wild_card(game_instance, card)
-        handle_draw_card(game_instance, card)
+        self.handle_wild_card(game_instance, card)
+        self.handle_draw_card(game_instance, card)
 
     def create_special_wild_card(self, draw_amount):
         display_name = 'wild draw ' + str(draw_amount)

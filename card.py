@@ -40,7 +40,10 @@ class PowerCard(Card):
     
     def set_colour(self, colour):
         self.colour = colour
-        self.display_name = colour + ' ' + self.card_id
+
+        display = self.display_name if self.display_name != "" else self.card_id
+
+        self.display_name = colour + ' ' + display
         
     def handle_played(self, game_instance):
         if self.play_handler is not None: 

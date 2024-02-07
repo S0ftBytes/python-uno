@@ -27,7 +27,7 @@ class Game:
         play_random(self, player): Play a random card from a player's hand.
         play_card(self, player): Allow a player to select and play a specific card from their hand.
         handle_pickup(self, player, amount=1, reason='No playable cards'): Handle a player picking up cards from the deck.
-        get_last_played_card(self): Get the last card played in the game.
+        _get_last_played_card(self): Get the last card played in the game.
         get_playable_cards(self, player): Get a list of playable cards in a player's hand.
         handle_round(self): Handle a round of the game, including player turns and card plays.
         check_win_condition(self, player): Check if a player has won the game.
@@ -36,7 +36,7 @@ class Game:
         get_winner(self): Get the index of the winning player, if the game has ended.
     """
 
-    def __init__(self, player_count, cards_per_player):
+    def __init__(self, player_count, cards_per_player, turn_finished_callback=None):
         """Initialize a new game with the specified number of players and cards per player."""
         self.robots = []
 
@@ -52,6 +52,9 @@ class Game:
         self.play_direction = 1
         self.skipped_players = []
         self.winning_player = None
+        self.managed_play_handlers = {}
+        self.cards_played = 0
+        self.turn_finished_callback = turn_finished_callback
         
     def get_next_player(self):
         if self.play_direction == 1:
@@ -70,6 +73,9 @@ class Game:
     def get_current_player(self):
         return self.current_player
     
+    def is_robot(self, player):
+        return player in self.robots
+    
     def is_game_active(self):
         return self.game_active
     
@@ -85,70 +91,183 @@ class Game:
     
     def skip_player(self, player):
         self.skipped_players.append(player)
+
+    def _get_points(self, player):
+        player_hand = self.get_player_cards(player)
+
+        points = 1
+        for card in player_hand:
+            if isinstance(card, PowerCard):
+                if 'wild' in card.card_id:
+                    points += 50
+                else: points += 25
+            elif type(card.value) == int: points += card.value
+            else: points += 25
+
+        return points
+    
+    def get_game_state(self, player):
+        last_played_card = self._get_last_played_card()
+        current_number = 99 if isinstance(last_played_card, PowerCard) else last_played_card.value
+        current_colour = last_played_card.colour
+
+        matching_number = self._get_number_card(player, current_number) != None
+        matching_colour = self._get_colour_card(player, current_colour) != None
+        has_wild = self._get_wild_card(player) != None
+
+        return [matching_colour, matching_number, has_wild ]
         
-    def play_hand(self, player):
-        last_played_card = self.get_last_played_card()
+    def play_hand(self, player, action=None):
+        last_played_card = self._get_last_played_card()
         player_hand = self.get_player_cards(player)
         
         print('\nPlayer ' + str(player) + ", it is your turn to play!")
         print('The last played card was ' + str(last_played_card))
         
         print("Here are your all cards. (Not all are playable): " + str(player_hand))
+        print("Here are your playable cards: " + str(self._get_playable_cards(player)))
         card = None
 
-        if player in self.robots:
-            card = self.play_random(player)
+        if self.is_robot(player):
+            card = self._play_random(player)
         else:
+
             while card == None:
                 try:
-                    selection = int(input("Select card to play (1) or play random card (2)"))
+                    print("Please select one of the following play options:\n")
                     
-                    if selection == 1:
-                        card = self.play_card(player)
-                    elif selection == 2:
-                        card = self.play_random(player)
-                    else:
-                        print(type(selection))
+                    print("Play random same number (n)")
+                    print("Play random same colour (c)")
+                    print("Play wild card (w)")
+
+                    if action != None: selection = action
+                    else: selection = input()
+                    
+                    card = self._get_card_for_action(player, selection)
+                    if card == None:
+                        actions = self.get_actions(player)[0]
+                        card = self._get_card_for_action(player, actions[0])
                 except:
-                    print('You must enter either 1 or 2')
+                    print('Error: You must enter one of the provided options!')
             
+        reward = self._play_card(player, card)
+
+        return reward
+    
+    def _get_card_for_action(self, player, action):
+        actions, total_actions, number_card, colour_card, wild_card = self.get_actions(player)
+        card = None
+
+        if action.lower() == 'n' and 'n' in actions:
+            card = number_card
+        elif action.lower() == 'c' and 'c' in actions:
+            card = colour_card
+        elif action.lower() == 'w' and 'w' in actions:
+            card = wild_card
+
+        return card
         
-        self.played_cards.append(card)
-        player_hand.remove(card)
-        
-        print("You played " + str(card) + ', leaving you with ' + str(len(player_hand)) + " card(s) remaining!")
-        if isinstance(card, PowerCard):
-            card.handle_played(self)
+
+    def get_actions(self, player):
+        last_played_card = self._get_last_played_card()
+
+        last_played_number = None
+        last_played_colour = None
+
+        if not isinstance(last_played_card, PowerCard):
+            last_played_number = last_played_card.value
+            last_played_colour = last_played_card.colour
+        elif isinstance(last_played_card, PowerCard) and last_played_card.colour != "":
+            last_played_colour = last_played_card.colour
+
+        number_card = self._get_number_card(player, last_played_number)
+        colour_card = self._get_colour_card(player, last_played_colour)
+        wild_card = self._get_wild_card(player)
+
+        total_actions = ['n','c','w']
+        actions = []
+
+        if number_card != None:
+            actions.append(total_actions[0])
+        if colour_card != None:
+            actions.append(total_actions[1])
+        if wild_card != None:
+            actions.append(total_actions[2])
+
+        return actions, total_actions, number_card, colour_card, wild_card
             
-        if self.check_win_condition(player):
-            self.handle_win(player)
-            
-    def play_random(self, player):
-        player_hand = self.get_player_cards(player)
-        playable_cards = self.get_playable_cards(player)
+    def _play_random(self, player):
+        playable_cards = self._get_playable_cards(player)
         
         random_card = random.choice(playable_cards)
         
         return random_card
     
-    def play_card(self, player):
+    def _get_colour_card(self, player, colour):
+        if colour is None:
+            return None
+
+        player_hand = self._get_playable_cards(player)
+        colour_cards = [card for card in player_hand if card.colour == colour]
+
+        def sorting_key(card):
+            if type(card.value) == int:
+                return card.value
+            else:
+                return float('-inf')
+
+        colour_cards.sort(key=sorting_key, reverse=True)
+
+        if len(colour_cards) == 0:
+            return None
+
+        return random.choice(colour_cards)
+
+    def _get_number_card(self, player, number):
+        if(number == None): return None
+
+        player_hand = self._get_playable_cards(player)
+        number_cards = [card for card in player_hand if not isinstance(card, PowerCard) and card.value == number]
+
+        if len(number_cards) == 0: return None
+
+        return random.choice(number_cards)
+    
+    def _get_wild_card(self, player):
+        player_hand = self._get_playable_cards(player)
+        wild_cards = [card for card in player_hand if isinstance(card, PowerCard) and 'wild' in card.card_id]
+
+        if len(wild_cards) == 0: return None
+
+        return random.choice(wild_cards)
+
+    
+    def _play_card(self, player, card):
         player_hand = self.get_player_cards(player)
-        playable_cards = self.get_playable_cards(player)
+        starting_points = self._get_points(player)
+
+        self.played_cards.append(card)
+        player_hand.remove(card)
+
+        reward = 0
         
-        card = None        
-        while card == None:
-            try:
-                card_idx = int(input("These are your playable cards. Please enter the number for the card to play: " + str(playable_cards))) -1
-                
-                card = playable_cards[card_idx]
-            except KeyboardInterrupt:
-                raise    
-            except:
-                print('That is not a valid card index number!')
-            
+        print("You played " + str(card) + ', leaving you with ' + str(len(player_hand)) + " card(s) remaining!")
+        if isinstance(card, PowerCard):
+            card.handle_played(self)
         
-        return card
-        
+        self.cards_played += 1
+
+        game_won = self._check_win_condition(player)
+        if game_won:
+            self._handle_win(player)
+            reward = 1000
+
+        updated_points = self._get_points(player)
+        reward += starting_points - updated_points
+
+        if self.turn_finished_callback != None:
+            self.turn_finished_callback(game_won)
+        return reward
                    
     def handle_pickup(self, player, amount=1, reason='No playable cards'):
         if(amount >= len(self.current_deck)):
@@ -158,25 +277,24 @@ class Game:
         del self.current_deck[:amount]
         
         self.player_hands[player-1] += picked_up_cards
-        self.player_hands[player-1].sort()
         
         print('\nPlayer ' + str(player) + ' picked up ' + str(amount) + ' card(s) for the reason: ' + reason)
         print(str(picked_up_cards))
         
         
-    def get_last_played_card(self):
+    def _get_last_played_card(self):
         num_cards = len(self.played_cards)
         
         if num_cards == 0: return None
         return self.played_cards[num_cards-1]
         
-    def get_playable_cards(self, player):
+    def _get_playable_cards(self, player):
         player_cards = self.player_hands[player-1]
-        playable_cards = [card for card in player_cards if card.is_playable(self.get_last_played_card())]
+        playable_cards = [card for card in player_cards if card.is_playable(self._get_last_played_card())]
         
         return playable_cards
         
-    def handle_round(self):       
+    def _handle_round(self):       
         for player_itr in range(1, self.player_count + 1):
             if not self.game_active: break
             
@@ -188,33 +306,44 @@ class Game:
                 self.skipped_players.remove(player)
                 continue
             
-            playable_cards = self.get_playable_cards(player)
+            playable_cards = self._get_playable_cards(player)
             
             if len(playable_cards) == 0:
                 self.handle_pickup(player)
-                playable_cards = self.get_playable_cards(player)
-            if len(playable_cards) >= 1: self.play_hand(player)
+                playable_cards = self._get_playable_cards(player)
+            if len(playable_cards) == 0: return
+            
+            if player in self.managed_play_handlers:
+                managed_handler = self.managed_play_handlers.get(player)
+                managed_handler()
+            else: self.play_hand(player)
         
-    def check_win_condition(self, player):
-        player_hand = self.player_hands[player-1]
+    def _check_win_condition(self, player):
+        player_hand = self.get_player_cards(player)
         finished = len(player_hand) == 0
         
         return finished
     
-    def handle_win(self, player):
-        print("Player " + player + " has won!")
+    def _handle_win(self, player):
+        print(f"Player {player} has won!")
 
         self.winning_player = player
         self.game_active = False
 
     def get_winner(self):
-        return self.winning_player    
+        return self.winning_player
+    
+    def register_play_notifier(self, player, notifier):
+        self.managed_play_handlers[player] = notifier
+
+    def get_cards_played(self):
+        return self.cards_played
         
     def start_game(self):
         self.current_player = 0
         self.game_active = True
                    
         while self.game_active:
-            self.handle_round()
+            self._handle_round()
         
         return self.get_winner()

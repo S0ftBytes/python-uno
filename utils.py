@@ -69,3 +69,22 @@ def handle_deck_exhausted(deck, played_cards):
     new_deck = deck + played_cards
     
     return shuffle_deck(new_deck, [])
+
+def find_dominant_colour(deck, colours):
+    colour_counter = { }
+
+    if len(deck) == 0: return random.choice(colours)
+
+    for card in deck:
+        colour = card.colour
+        count = colour_counter[colour] + 1 if colour in colour_counter else 1
+
+        colour_counter[colour] = count
+
+    dominant_colour, count = max(colour_counter.items(), key=lambda x: x[1])
+    if dominant_colour == None or dominant_colour == "": dominant_colour = random.choice(colours)
+
+    return dominant_colour
+
+def argmax(list):
+    return list.index(max(list))
