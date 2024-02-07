@@ -1,6 +1,5 @@
 import random
 import numpy as np
-import torch
 import time
 from utils import argmax
 from uno import Game
@@ -71,7 +70,7 @@ class Trainer:
         self.number_of_games = number_of_games
 
     def reset_game(self):
-        self.game_instance = Game(GAME_TOTAL_PLAYERS, GAME_CARDS_PER_PLAYER, self.handle_turn_finished)
+        self.game_instance = Game(GAME_TOTAL_PLAYERS, GAME_CARDS_PER_PLAYER, self.handle_turn_finished, False)
         self.game_instance.register_play_notifier(self.agent.player, self.handle_turn_ready)
 
         self.agent.game_number += 1

@@ -14,7 +14,7 @@ class Player:
         self.game_won = False
 
     def _setup_game(self):
-        self.game_instance = Game(1, 7, turn_finished_callback=self.handle_turn_finished)
+        self.game_instance = Game(1, 7, self.handle_turn_finished, False)
 
         self.game_instance.register_play_notifier(self.player, self.handle_turn_ready)
         self.game_instance.start_game()

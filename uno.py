@@ -36,7 +36,7 @@ class Game:
         get_winner(self): Get the index of the winning player, if the game has ended.
     """
 
-    def __init__(self, player_count, cards_per_player, turn_finished_callback=None):
+    def __init__(self, player_count, cards_per_player, turn_finished_callback=None, logging=True):
         """Initialize a new game with the specified number of players and cards per player."""
         self.robots = []
 
@@ -55,6 +55,7 @@ class Game:
         self.managed_play_handlers = {}
         self.cards_played = 0
         self.turn_finished_callback = turn_finished_callback
+        self.logging_enabled = logging
         
     def get_next_player(self):
         if self.play_direction == 1:
@@ -121,11 +122,11 @@ class Game:
         last_played_card = self._get_last_played_card()
         player_hand = self.get_player_cards(player)
         
-        print('\nPlayer ' + str(player) + ", it is your turn to play!")
-        print('The last played card was ' + str(last_played_card))
+        utils.log('\nPlayer ' + str(player) + ", it is your turn to play!", self.logging_enabled)
+        utils.log('The last played card was ' + str(last_played_card), self.logging_enabled)
         
-        print("Here are your all cards. (Not all are playable): " + str(player_hand))
-        print("Here are your playable cards: " + str(self._get_playable_cards(player)))
+        utils.log("Here are your all cards. (Not all are playable): " + str(player_hand), self.logging_enabled)
+        utils.log("Here are your playable cards: " + str(self._get_playable_cards(player)), self.logging_enabled)
         card = None
 
         if self.is_robot(player):
@@ -134,11 +135,11 @@ class Game:
 
             while card == None:
                 try:
-                    print("Please select one of the following play options:\n")
+                    utils.log("Please select one of the following play options:\n", self.logging_enabled)
                     
-                    print("Play random same number (n)")
-                    print("Play random same colour (c)")
-                    print("Play wild card (w)")
+                    utils.log("Play random same number (n)", self.logging_enabled)
+                    utils.log("Play random same colour (c)", self.logging_enabled)
+                    utils.log("Play wild card (w)", self.logging_enabled)
 
                     if action != None: selection = action
                     else: selection = input()
@@ -148,7 +149,7 @@ class Game:
                         actions = self.get_actions(player)[0]
                         card = self._get_card_for_action(player, actions[0])
                 except:
-                    print('Error: You must enter one of the provided options!')
+                    utils.log('Error: You must enter one of the provided options!', self.logging_enabled)
             
         reward = self._play_card(player, card)
 
@@ -251,7 +252,7 @@ class Game:
 
         reward = 0
         
-        print("You played " + str(card) + ', leaving you with ' + str(len(player_hand)) + " card(s) remaining!")
+        utils.log("You played " + str(card) + ', leaving you with ' + str(len(player_hand)) + " card(s) remaining!", self.logging_enabled)
         if isinstance(card, PowerCard):
             card.handle_played(self)
         
@@ -271,15 +272,15 @@ class Game:
                    
     def handle_pickup(self, player, amount=1, reason='No playable cards'):
         if(amount >= len(self.current_deck)):
-            self.current_deck, self.played_cards = utils.handle_deck_exhausted(self.current_deck, self.played_cards)
+            self.current_deck, self.played_cards = utils.handle_deck_exhausted(self.current_deck, self.played_cards, self.logging_enabled)
         
         picked_up_cards = self.current_deck[:amount]
         del self.current_deck[:amount]
         
         self.player_hands[player-1] += picked_up_cards
         
-        print('\nPlayer ' + str(player) + ' picked up ' + str(amount) + ' card(s) for the reason: ' + reason)
-        print(str(picked_up_cards))
+        utils.log('\nPlayer ' + str(player) + ' picked up ' + str(amount) + ' card(s) for the reason: ' + reason, self.logging_enabled)
+        utils.log(str(picked_up_cards), self.logging_enabled)
         
         
     def _get_last_played_card(self):
@@ -302,7 +303,7 @@ class Game:
             self.current_player = player
             
             if player in self.skipped_players:
-                print("Player " + str(player) + ' was skipped!')
+                utils.log("Player " + str(player) + ' was skipped!', self.logging_enabled)
                 self.skipped_players.remove(player)
                 continue
             
@@ -325,7 +326,7 @@ class Game:
         return finished
     
     def _handle_win(self, player):
-        print(f"Player {player} has won!")
+        utils.log(f"Player {player} has won!", self.logging_enabled)
 
         self.winning_player = player
         self.game_active = False

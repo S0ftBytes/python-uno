@@ -6,7 +6,6 @@ import numpy as np
 import ast
 
 def store_move(instance, old_state, action, reward, new_state, game_over):
-    print('store move')
     rows = [old_state, action, reward, new_state, game_over]
 
     Path("instance_data").mkdir(parents=True, exist_ok=True)

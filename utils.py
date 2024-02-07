@@ -63,8 +63,8 @@ def deal_cards(deck, player_count, cards_per_player):
 
     return [player_hands[i:i + cards_per_player] for i in range(0, total_cards_needed, cards_per_player)]
 
-def handle_deck_exhausted(deck, played_cards):
-    print("The game deck has been exhausted! Now shuffling played cards...")
+def handle_deck_exhausted(deck, played_cards, logging=True):
+    log("The game deck has been exhausted! Now shuffling played cards...", logging)
     
     new_deck = deck + played_cards
     
@@ -88,3 +88,7 @@ def find_dominant_colour(deck, colours):
 
 def argmax(list):
     return list.index(max(list))
+
+def log(message, logging_enabled):
+    if logging_enabled:
+        print(message)
