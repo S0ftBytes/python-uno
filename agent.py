@@ -7,6 +7,7 @@ from uno import Game
 from collections import deque
 from model import Linear_QNet, QTrainer
 import storage_utils
+import model_utils
 
 MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
@@ -48,18 +49,15 @@ class Agent:
 
     def get_action(self, state):
         self.epsilon = self.epsilon_exp - self.game_number
-        final_move = [0,0,0]
 
         if random.randint(0,200) < self.epsilon:
             move = random.randint(0,2)
-            final_move[move] = 1
-        else:
-            state0 = torch.tensor(state, dtype=torch.float)
-            prediction = self.model(state0)
-            move = torch.argmax(prediction).item()
-            final_move[move] = 1
 
-        return final_move
+            moves = [0,0,0]
+            moves[move] = 1
+
+            return moves
+        else: return model_utils.predict_action(self.model, state)
         
 
 
