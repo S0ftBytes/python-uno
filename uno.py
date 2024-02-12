@@ -198,7 +198,7 @@ class Game:
         self.winning_player = player
         self.game_active = False
 
-    def get_winner():
+    def get_winner(self):
         return self.winning_player    
         
     def start_game(self):
@@ -208,4 +208,4 @@ class Game:
         while self.game_active:
             self.handle_round()
         
-        return get_winner()
+        return self.get_winner()
