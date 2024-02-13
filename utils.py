@@ -70,18 +70,27 @@ def handle_deck_exhausted(deck, played_cards, logging=True):
     
     return shuffle_deck(new_deck, [])
 
-def find_dominant_colour(deck, colours):
+def count_colour_cards(deck, colours):
     colour_counter = { }
-
-    if len(deck) == 0: return random.choice(colours)
 
     for card in deck:
         colour = card.colour
+        if colour not in colours or isinstance(card, PowerCard): continue
         count = colour_counter[colour] + 1 if colour in colour_counter else 1
 
         colour_counter[colour] = count
 
-    dominant_colour, count = max(colour_counter.items(), key=lambda x: x[1])
+    for colour in colours:
+        if colour not in colour_counter: colour_counter[colour] = 0
+    
+    return { key: value for key, value in sorted(colour_counter.items())}
+
+def find_dominant_colour(deck, colours):
+    if len(deck) == 0: return random.choice(colours)
+
+    colour_count = count_colour_cards(deck, colours)
+
+    dominant_colour, count = max(colour_count.items(), key=lambda x: x[1])
     if dominant_colour == None or dominant_colour == "": dominant_colour = random.choice(colours)
 
     return dominant_colour

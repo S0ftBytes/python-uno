@@ -2,6 +2,8 @@ import random
 import utils
 from card import PowerCard
 
+COLOURS = ['yellow', 'green', 'blue', 'red']
+
 class Game:
     """A class representing representing the classic uno card game.
 
@@ -45,7 +47,7 @@ class Game:
             self.robots.append(2)
 
         self.player_count = player_count
-        self.current_deck, self.played_cards = utils.shuffle_deck(utils.create_deck(['yellow', 'green', 'blue', 'red']))
+        self.current_deck, self.played_cards = utils.shuffle_deck(utils.create_deck(COLOURS))
         self.player_hands = utils.deal_cards(self.current_deck, player_count, cards_per_player)
         self.current_player = 0
         self.game_active = False
@@ -108,15 +110,26 @@ class Game:
         return points
     
     def get_game_state(self, player):
+        player_cards = self.get_player_cards(player)
+
         last_played_card = self._get_last_played_card()
-        current_number = 99 if isinstance(last_played_card, PowerCard) else last_played_card.value
+        current_number = -1 if isinstance(last_played_card, PowerCard) else last_played_card.value
         current_colour = last_played_card.colour
 
-        matching_number = self._get_number_card(player, current_number) != None
-        matching_colour = self._get_colour_card(player, current_colour) != None
-        has_wild = self._get_wild_card(player) != None
+        colour_card_counts = utils.count_colour_cards(player_cards, COLOURS)
 
-        return [matching_colour, matching_number, has_wild ]
+        matching_number = self._get_number_card(player, current_number) != None
+        matching_colour = colour_card_counts[current_colour]
+        wild_cards = self._get_wild_card(player, True)
+        power_cards = self._get_power_card(player, current_colour, True)
+        has_wild = len(wild_cards) >= 1
+        second_last_card = len(player_cards) == 2
+
+        has_power_card = len(power_cards) >= 1
+        next_player = self.get_next_player()
+        points = self._get_points(player)
+
+        return [matching_colour, matching_number, has_wild, second_last_card, current_number, *colour_card_counts.values(), has_power_card, points, next_player ]
         
     def play_hand(self, player, action=None):
         last_played_card = self._get_last_played_card()
@@ -129,6 +142,7 @@ class Game:
         utils.log("Here are your playable cards: " + str(self._get_playable_cards(player)), self.logging_enabled)
         card = None
 
+        penalty = False
         if self.is_robot(player):
             card = self._play_random(player)
         else:
@@ -140,6 +154,7 @@ class Game:
                     utils.log("Play random same number (n)", self.logging_enabled)
                     utils.log("Play random same colour (c)", self.logging_enabled)
                     utils.log("Play wild card (w)", self.logging_enabled)
+                    utils.log("Play power card (p)", self.logging_enabled)
 
                     if action != None: selection = action
                     else: selection = input()
@@ -148,15 +163,18 @@ class Game:
                     if card == None:
                         actions = self.get_actions(player)[0]
                         card = self._get_card_for_action(player, actions[0])
+
+                        penalty = True
                 except:
                     utils.log('Error: You must enter one of the provided options!', self.logging_enabled)
             
         reward = self._play_card(player, card)
+        if(penalty): reward = -1
 
         return reward
     
     def _get_card_for_action(self, player, action):
-        actions, total_actions, number_card, colour_card, wild_card = self.get_actions(player)
+        actions, total_actions, number_card, colour_card, wild_card, power_card = self.get_actions(player)
         card = None
 
         if action.lower() == 'n' and 'n' in actions:
@@ -165,6 +183,8 @@ class Game:
             card = colour_card
         elif action.lower() == 'w' and 'w' in actions:
             card = wild_card
+        elif action.lower() == 'p' and 'p' in actions:
+            card = power_card
 
         return card
         
@@ -183,9 +203,10 @@ class Game:
 
         number_card = self._get_number_card(player, last_played_number)
         colour_card = self._get_colour_card(player, last_played_colour)
+        power_card = self._get_power_card(player, last_played_colour)
         wild_card = self._get_wild_card(player)
 
-        total_actions = ['n','c','w']
+        total_actions = ['n','c','w', 'p']
         actions = []
 
         if number_card != None:
@@ -194,22 +215,25 @@ class Game:
             actions.append(total_actions[1])
         if wild_card != None:
             actions.append(total_actions[2])
+        if power_card != None:
+            actions.append(total_actions[3])
 
-        return actions, total_actions, number_card, colour_card, wild_card
+        return actions, total_actions, number_card, colour_card, wild_card, power_card
             
     def _play_random(self, player):
-        playable_cards = self._get_playable_cards(player)
+        actions = self.get_actions(player)[0]
+        action = random.choice(actions)
         
-        random_card = random.choice(playable_cards)
+        random_card = self._get_card_for_action(player, action)
         
         return random_card
     
-    def _get_colour_card(self, player, colour):
+    def _get_colour_card(self, player, colour, as_list=False):
         if colour is None:
             return None
 
         player_hand = self._get_playable_cards(player)
-        colour_cards = [card for card in player_hand if card.colour == colour]
+        colour_cards = [card for card in player_hand if card.colour == colour and not isinstance(card, PowerCard)]
 
         def sorting_key(card):
             if type(card.value) == int:
@@ -219,28 +243,41 @@ class Game:
 
         colour_cards.sort(key=sorting_key, reverse=True)
 
+        if as_list: return colour_cards
         if len(colour_cards) == 0:
             return None
 
         return random.choice(colour_cards)
 
-    def _get_number_card(self, player, number):
+    def _get_number_card(self, player, number, as_list=False):
         if(number == None): return None
 
         player_hand = self._get_playable_cards(player)
         number_cards = [card for card in player_hand if not isinstance(card, PowerCard) and card.value == number]
 
+        if as_list: return number_cards
         if len(number_cards) == 0: return None
 
         return random.choice(number_cards)
     
-    def _get_wild_card(self, player):
+    def _get_wild_card(self, player, as_list=False):
         player_hand = self._get_playable_cards(player)
         wild_cards = [card for card in player_hand if isinstance(card, PowerCard) and 'wild' in card.card_id]
 
+        if as_list: return wild_cards
         if len(wild_cards) == 0: return None
 
         return random.choice(wild_cards)
+    
+    def _get_power_card(self, player, colour, as_list=False):
+        player_hand = self.get_player_cards(player)        
+        power_cards = [card for card in player_hand if card.colour == colour and isinstance(card, PowerCard) and 'wild' not in card.card_id]
+
+        if as_list: return power_cards
+
+        if len(power_cards) == 0: return None
+
+        return random.choice(power_cards)
 
     
     def _play_card(self, player, card):

@@ -4,14 +4,20 @@ import numpy as np
 from uno import Game
 from utils import argmax
 from model import Linear_QNet
+from plotting import plot_wins
 
 class Player:
-    def __init__(self, model):
+    def __init__(self, model, number_of_games):
         self.model = model
         self.game_instance = None
         self.player = 1
         self.game_over = False
-        self.game_won = False
+        self.games_won = 0
+        self.number_of_games = number_of_games
+
+    def reset(self):
+        self.game_instance = None
+        self.game_over = False
 
     def _setup_game(self):
         self.game_instance = Game(1, 7, self.handle_turn_finished, False)
@@ -39,24 +45,27 @@ class Player:
             winner = self.game_instance.get_winner()
 
             if winner == self.player:
-                self.game_won = True
+                self.games_won += 1
 
             self.game_over = True
     
     def run_player(self):
-        self._setup_game()
+        for i in range(self.number_of_games):
+            count_games_won = self.games_won
+            self._setup_game()
 
-        while not self.game_over:
-            time.sleep(0.1)
-        
-        if self.game_won:
-            print('Model won the game!')
-        else: print('Model lost the game :(')
+            while not self.game_over:
+                time.sleep(0.1)
+            
+            if self.games_won > count_games_won:
+                print('Model won the game!')
+            else: print('Model lost the game :(')
 
-        return self.game_won
+            if(self.number_of_games > 1): plot_wins(['AI', 'Computer'], [self.games_won, i - self.games_won])
+        return self.games_won
 
 if __name__ == '__main__':
-    model = Linear_QNet(3, 256, 3)
-    player = Player(model)
+    model = Linear_QNet(12, 256, 3)
+    player = Player(model, 100)
 
     player.run_player()

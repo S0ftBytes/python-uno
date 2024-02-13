@@ -1,2 +1,4 @@
 .DS_Store
 training_data.csv
+model/
+instance_data/

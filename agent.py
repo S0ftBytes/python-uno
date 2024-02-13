@@ -7,6 +7,7 @@ from collections import deque
 from model import Linear_QNet, QTrainer
 import storage_utils
 import model_utils
+from plotting import plot_wins
 
 MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
@@ -19,9 +20,9 @@ class Agent:
         self.game_number = 0
         self.epsilon_exp = 80
         self.epsilon = 0
-        self.gamma = 0.9
+        self.gamma = 0.2
         self.memory = deque(maxlen=MAX_MEMORY)
-        self.model = Linear_QNet(3, 256, 3)
+        self.model = Linear_QNet(12, 256, 3)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
         #The lower the better (cards played for the whole game)
@@ -41,6 +42,7 @@ class Agent:
         
         states, actions, rewards, next_states, game_finished = zip(*mini_sample)
         self.trainer.train_step(states, actions, rewards, next_states, game_finished)
+        self.model.save()
 
 
     def train_short_term(self, state, action, reward, next_state, game_finished):
@@ -52,7 +54,7 @@ class Agent:
         if random.randint(0,200) < self.epsilon:
             move = random.randint(0,2)
 
-            moves = [0,0,0]
+            moves = [0,0,0,0]
             moves[move] = 1
 
             return moves
@@ -68,13 +70,15 @@ class Trainer:
         self.instance_number = instance_number
         self.mode = mode
         self.number_of_games = number_of_games
+        self.cards_played_hist = []
+        self.cards_played_mean_hist = []
+        self.total_cards_played = 0
 
     def reset_game(self):
         self.game_instance = Game(GAME_TOTAL_PLAYERS, GAME_CARDS_PER_PLAYER, self.handle_turn_finished, False)
         self.game_instance.register_play_notifier(self.agent.player, self.handle_turn_ready)
 
         self.agent.game_number += 1
-        print('Starting new game...')
         self.game_over = False
         self.game_instance.start_game()
 
@@ -125,20 +129,24 @@ class Trainer:
             if winner == self.agent.player:
                 if cards_played < self.agent.min_cards_played: self.agent.min_cards_played = cards_played
                 self.agent.games_won += 1
-                
-            print(f'Game: {self.agent.game_number}, Winner: player {winner}, Cards played: {cards_played}, Record cards, Record cards played: {self.agent.min_cards_played}')
-
+            
+            if self.instance_number == 1:
+                self.cards_played_hist.append(cards_played)
+                self.total_cards_played += cards_played
 
     def play(self):
         print('Begin training...')
         start_time = time.time()
 
-        for _ in range(self.number_of_games):
+        for i in range(self.number_of_games):
             self.reset_game()
 
             while not self.game_over:
                 time.sleep(0.01)
 
+            if self.instance_number == 1:
+                self.cards_played_mean_hist.append(self.total_cards_played / (i + 1))
+            
         end_time = time.time()
         training_time = end_time - start_time
 
